@@ -1,0 +1,348 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dropbox File Uploader</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card: #121933;
+      --muted: #8ea0c8;
+      --text: #e9eefc;
+      --accent: #5aa7ff;
+      --accent-2: #8b5cf6;
+      --danger: #ff6b6b;
+      --ok: #10b981;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+      background: radial-gradient(1200px 800px at 20% -10%, #1a2350 0%, #0b1020 60%);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      place-items: start center;
+      padding: 32px 16px 56px;
+    }
+    .container { width: 100%; max-width: 920px; }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      border: 1px solid rgba(255,255,255,0.08);
+      backdrop-filter: blur(8px);
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    h1 { font-size: clamp(26px, 3.2vw, 38px); margin: 0 0 8px; letter-spacing: 0.2px; }
+    p.sub { margin: 0 0 16px; color: var(--muted); }
+    .row { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 720px){ .row-2 { grid-template-columns: 2fr 3fr; } }input[type="text"], input[type="password"], input[type="file"], input[type="search"], select {
+  width: 100%;
+  background: #0e1530;
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  padding: 12px 14px;
+  outline: none;
+}
+input::file-selector-button {
+  background: #1b2758; color: var(--text); border: none; padding: 10px 14px; border-radius: 10px; margin-right: 10px; cursor: pointer;
+}
+label { font-size: 13px; color: var(--muted); display: inline-block; margin-bottom: 6px; }
+
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+button {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff; border: 0; padding: 12px 16px; border-radius: 14px; cursor: pointer; font-weight: 600;
+  box-shadow: 0 6px 20px rgba(90,167,255,0.25);
+}
+button.secondary { background: #1b2758; box-shadow: none; }
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+.list { margin-top: 18px; display: grid; gap: 12px; }
+.file-item {
+  display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
+  background: #0f1633; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 12px;
+}
+.name { font-weight: 600; }
+.size { color: var(--muted); font-size: 12px; }
+.status { font-size: 12px; color: var(--muted); }
+.progress {
+  height: 8px; background: #101737; border-radius: 999px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08);
+}
+.bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width 0.15s ease; }
+
+.linkbox { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-top: 8px; }
+.url {
+  background: #0b132e; padding: 8px 10px; border: 1px dashed rgba(255,255,255,0.16); border-radius: 10px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ok { color: var(--ok); }
+.err { color: var(--danger); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+
+.footer { margin-top: 18px; font-size: 12px; color: var(--muted); }
+.kbd { background:#0f1633;border:1px solid rgba(255,255,255,0.12); padding: 2px 6px; border-radius: 6px; }
+
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>Dropbox File Uploader</h1>
+      <p class="sub">Upload any files to your Dropbox and instantly copy a share link.</p><div class="row row-2" style="margin-top:14px;">
+    <div>
+      <label for="token">Dropbox API Key (Access Token)</label>
+      <input id="token" type="password" placeholder="Paste your Dropbox access token here" autocomplete="off" />
+      <div class="actions" style="margin-top:8px;">
+        <button class="secondary" id="saveTokenBtn">Save to this browser</button>
+        <button class="secondary" id="revealBtn">Show/Hide</button>
+        <button class="secondary" id="clearTokenBtn">Forget</button>
+      </div>
+      <p class="hint">For best security, generate a <b>short‑lived</b> access token on your own server and paste it here. Avoid hard‑coding tokens in public sites.</p>
+    </div>
+    <div>
+      <label for="folder">Destination Folder in Dropbox</label>
+      <input id="folder" type="text" placeholder="e.g. /Apps/MyUploader" value="/Apps/PublicUploads"/>
+      <p class="hint">If the folder doesn’t exist, Dropbox will create the path on first upload.</p>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:14px;">
+    <div>
+      <label for="files">Choose Files</label>
+      <input id="files" type="file" multiple />
+    </div>
+  </div>
+
+  <div class="actions" style="margin-top:12px;">
+    <button id="uploadBtn">Upload</button>
+    <button id="cancelBtn" class="secondary">Cancel All</button>
+  </div>
+
+  <div id="list" class="list"></div>
+
+  <div class="footer">
+    <p>Tips: Use <span class="kbd">Ctrl/Cmd</span> + <span class="kbd">V</span> to paste your token. Copy buttons appear after each upload completes.</p>
+  </div>
+</div>
+
+  </div>  <script>
+    // ====== Utilities ======
+    const $ = (sel, el=document) => el.querySelector(sel);
+    const list = document.getElementById('list');
+    const tokenInput = document.getElementById('token');
+    const folderInput = document.getElementById('folder');
+    const filesInput = document.getElementById('files');
+
+    // Load saved token on start
+    (function init(){
+      const saved = localStorage.getItem('dropbox_token');
+      if(saved) tokenInput.value = saved;
+    })();
+
+    document.getElementById('saveTokenBtn').onclick = () => {
+      localStorage.setItem('dropbox_token', tokenInput.value.trim());
+      toast('Token saved to this browser.', 'ok');
+    };
+    document.getElementById('clearTokenBtn').onclick = () => {
+      localStorage.removeItem('dropbox_token'); tokenInput.value = '';
+      toast('Token cleared.', 'ok');
+    };
+    document.getElementById('revealBtn').onclick = () => {
+      tokenInput.type = tokenInput.type === 'password' ? 'text' : 'password';
+    };
+
+    let abortControllers = [];
+
+    document.getElementById('uploadBtn').onclick = async () => {
+      const token = tokenInput.value.trim();
+      if(!token){ toast('Please paste your Dropbox access token.', 'err'); return; }
+      const files = Array.from(filesInput.files || []);
+      if(files.length === 0){ toast('Please choose at least one file.', 'err'); return; }
+      abortControllers = [];
+      for(const file of files){
+        await uploadOne(file, token).catch(err => console.error(err));
+      }
+    };
+
+    document.getElementById('cancelBtn').onclick = () => {
+      abortControllers.forEach(c => c.abort());
+      abortControllers = [];
+      toast('All uploads cancelled.', 'err');
+    };
+
+    function toast(msg, kind='ok'){
+      const el = document.createElement('div');
+      el.textContent = msg; el.style.position='fixed'; el.style.bottom='16px'; el.style.left='50%'; el.style.transform='translateX(-50%)';
+      el.style.background = kind==='ok'? 'rgba(16,185,129,0.15)' : 'rgba(255,107,107,0.15)';
+      el.style.border = `1px solid ${kind==='ok'?'#10b981':'#ff6b6b'}`;
+      el.style.color = 'var(--text)'; el.style.backdropFilter='blur(8px)'; el.style.padding='10px 14px'; el.style.borderRadius='10px'; el.style.zIndex=9999;
+      document.body.appendChild(el); setTimeout(()=>{ el.remove(); }, 2200);
+    }
+
+    function fmtBytes(bytes){
+      const units=['B','KB','MB','GB','TB'];
+      let i=0, num=bytes; while(num>=1024 && i<units.length-1){ num/=1024; i++; }
+      return `${num.toFixed(num<10&&i>0?1:0)} ${units[i]}`;
+    }
+
+    function createItem(file){
+      const item = document.createElement('div'); item.className='file-item';
+      item.innerHTML = `
+        <div>
+          <div class="name">${file.name}</div>
+          <div class="size">${fmtBytes(file.size)}</div>
+          <div class="progress" style="margin-top:8px;"><div class="bar"></div></div>
+          <div class="status" style="margin-top:8px;">Waiting…</div>
+          <div class="linkbox" style="display:none;">
+            <div class="url"></div>
+            <button class="secondary copyBtn">Copy Link</button>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="secondary cancelOne">Cancel</button>
+        </div>`;
+      list.prepend(item);
+      return item;
+    }
+
+    async function uploadOne(file, token){
+      const item = createItem(file);
+      const bar = $('.bar', item); const status = $('.status', item);
+      const urlBoxWrap = $('.linkbox', item); const urlBox = $('.url', item); const copyBtn = $('.copyBtn', item);
+      const cancelBtn = $('.cancelOne', item);
+
+      const controller = new AbortController(); abortControllers.push(controller);
+      cancelBtn.onclick = () => controller.abort();
+
+      const path = (folderInput.value.trim() || '/Apps/PublicUploads').replace(/\/+$/, '') + '/' + sanitizePath(file.name);
+
+      try {
+        status.textContent = 'Starting…';
+        const link = await uploadFileChunked(token, file, path, (pct)=>{ bar.style.width = pct + '%'; status.textContent = `Uploading… ${pct}%`; }, controller.signal);
+
+        status.innerHTML = `<span class="ok">Uploaded.</span> Creating share link…`;
+        const sharedUrl = await ensureSharedLink(token, path);
+
+        urlBox.textContent = sharedUrl; urlBox.title = sharedUrl; urlBoxWrap.style.display='grid';
+        copyBtn.onclick = () => { navigator.clipboard.writeText(sharedUrl).then(()=> toast('Link copied!', 'ok')); };
+        status.innerHTML = `<span class="ok">Ready.</span>`;
+        bar.style.width = '100%';
+      } catch (e){
+        if(e.name === 'AbortError'){
+          status.innerHTML = `<span class="err">Cancelled.</span>`;
+        } else {
+          console.error(e);
+          status.innerHTML = `<span class="err">Error:</span> ${e.message || e}`;
+        }
+      }
+    }
+
+    function sanitizePath(name){
+      // Dropbox paths must not contain certain control chars. Keep it simple.
+      return name.replace(/[\\:*?"<>|]/g, '_');
+    }
+
+    // ---- Dropbox API helpers ----
+    async function uploadFileChunked(token, file, path, onProgress, abortSignal){
+      const CHUNK = 8 * 1024 * 1024; // 8MB chunks
+      let uploaded = 0; let sessionId = null;
+
+      // Start session
+      const startResp = await fetch('https://content.dropboxapi.com/2/files/upload_session/start', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Dropbox-API-Arg': JSON.stringify({ close: false }),
+          'Content-Type': 'application/octet-stream'
+        },
+        body: file.slice(0, Math.min(CHUNK, file.size)),
+        signal: abortSignal
+      });
+      if(!startResp.ok){ throw await explainError(startResp); }
+      const startData = await startResp.json();
+      sessionId = startData.session_id;
+      uploaded += Math.min(CHUNK, file.size); onProgress(Math.min(100, Math.floor(uploaded / file.size * 100)));
+
+      // Append chunks
+      while(uploaded < file.size){
+        const next = Math.min(CHUNK, file.size - uploaded);
+        const appendResp = await fetch('https://content.dropboxapi.com/2/files/upload_session/append_v2', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Dropbox-API-Arg': JSON.stringify({ cursor: { session_id: sessionId, offset: uploaded }, close: false }),
+            'Content-Type': 'application/octet-stream'
+          },
+          body: file.slice(uploaded, uploaded + next),
+          signal: abortSignal
+        });
+        if(!appendResp.ok){ throw await explainError(appendResp); }
+        uploaded += next; onProgress(Math.min(100, Math.floor(uploaded / file.size * 100)));
+      }
+
+      // Finish session
+      const finishResp = await fetch('https://content.dropboxapi.com/2/files/upload_session/finish', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Dropbox-API-Arg': JSON.stringify({ cursor: { session_id: sessionId, offset: uploaded }, commit: { path, mode: 'add', autorename: true, mute: false } }),
+          'Content-Type': 'application/octet-stream'
+        },
+        body: new Blob([]),
+        signal: abortSignal
+      });
+      if(!finishResp.ok){ throw await explainError(finishResp); }
+      const finishData = await finishResp.json();
+      return finishData.path_lower;
+    }
+
+    async function ensureSharedLink(token, path){
+      // Try to create a shared link. If it already exists, Dropbox returns a specific error; then we list.
+      const created = await fetch('https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type':'application/json' },
+        body: JSON.stringify({ path, settings: { requested_visibility: 'public' } })
+      });
+      if(created.ok){
+        const data = await created.json();
+        return toDirectDownload(data.url);
+      }
+      // If already has link, list it
+      const cjson = await created.json().catch(()=>({}));
+      if(cjson && cjson.error && cjson.error['.tag'] === 'shared_link_already_exists'){
+        const listResp = await fetch('https://api.dropboxapi.com/2/sharing/list_shared_links', {
+          method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type':'application/json' },
+          body: JSON.stringify({ path, direct_only: true })
+        });
+        if(!listResp.ok){ throw await explainError(listResp); }
+        const listData = await listResp.json();
+        const link = listData.links && listData.links[0] && listData.links[0].url;
+        if(!link) throw new Error('No shared link found.');
+        return toDirectDownload(link);
+      }
+      throw new Error(cjson?.error_summary || 'Unable to create shared link');
+    }
+
+    function toDirectDownload(url){
+      // Convert ?dl=0 to ?dl=1 for direct download; if not present, append.
+      try {
+        const u = new URL(url);
+        if(u.searchParams.has('dl')){ u.searchParams.set('dl','1'); }
+        else { u.searchParams.append('dl','1'); }
+        return u.toString();
+      } catch {
+        // Fallback: replace
+        return url.replace('?dl=0','?dl=1');
+      }
+    }
+
+    async function explainError(resp){
+      let msg = `${resp.status} ${resp.statusText}`;
+      try { const j = await resp.json(); msg += ` — ${j.error_summary || JSON.stringify(j)}`; } catch {}
+      return new Error(msg);
+    }
+  </script></body>
+</html>
